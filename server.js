@@ -8,7 +8,7 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 
-// Serve static assets
+// Serve static assets (css, js, images)
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 
