@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>IPL Auction Arena</title>
-<script src="/socket.io/socket.io.js"></script>
 <style>
 :root{--bg:#f4f1ea;--card:#fff;--ink:#1b1b1f;--mut:#6b6b76;--acc:#1f4fd8;--ok:#14803c;--bad:#c0262d;--line:#e2ddd0;box-sizing:border-box}
 @media(prefers-color-scheme:dark){:root{--bg:#111318;--card:#1b1e26;--ink:#eceef3;--mut:#9aa0ae;--acc:#6b8cff;--ok:#3ecf74;--bad:#ff6b72;--line:#2b3040;color-scheme:dark}}
@@ -38,7 +37,34 @@ details{margin:4px 0;font-size:14px}summary{cursor:pointer;font-weight:600}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app">
+  <h1>🏏 IPL Auction Arena</h1>
+  <div id="msg"></div>
+  <div class="card">
+    <h3>Your name</h3>
+    <input id="nm" placeholder="e.g. Alex">
+  </div>
+  <div class="card">
+    <h3>Join a lobby</h3>
+    <div class="row">
+      <input id="cd" inputmode="numeric" placeholder="4-digit lobby PIN">
+      <button class="pri" onclick="join()">Join</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Or create a lobby (you become the host)</h3>
+    <div class="grid">
+      <label>Purse (Cr)<input id="pu" type="number" value="100"></label>
+      <label>RTM cards each<input id="rt" type="number" value="2"></label>
+      <label>Max squad<input id="sq" type="number" value="15"></label>
+      <label>Shuffle order<input id="sh" type="checkbox" checked></label>
+    </div>
+    <textarea id="ex" rows="2" style="margin:10px 0" placeholder="Extra players (optional): Name,ROLE,BaseCr,PrevTeam, one per line"></textarea>
+    <button class="pri" onclick="create()">Create lobby</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
 <script>
 var TM={CSK:1,MI:1,RCB:1,KKR:1,DC:1,SRH:1,RR:1,PBKS:1,GT:1,LSG:1};
 var P="Rishabh Pant,WK,2,DC;Shreyas Iyer,BAT,2,KKR;KL Rahul,WK,2,LSG;Jos Buttler,WK,2,RR*;Mohammed Shami,BOW,2,GT;Arshdeep Singh,BOW,2,PBKS;Yuzvendra Chahal,BOW,2,RR;Kagiso Rabada,BOW,2,PBKS*;Mitchell Starc,BOW,2,KKR*;Mohammed Siraj,BOW,2,RCB;Trent Boult,BOW,2,RR*;Phil Salt,WK,2,KKR*;Liam Livingstone,AR,2,PBKS*;David Miller,BAT,1.5,GT*;Ishan Kishan,WK,2,MI;Devdutt Padikkal,BAT,0.75,LSG;Rahul Tripathi,BAT,0.75,SRH;Venkatesh Iyer,AR,2,KKR;Harshal Patel,BOW,2,PBKS;R Ashwin,AR,2,RR;Marcus Stoinis,AR,2,LSG*;Glenn Maxwell,AR,2,RCB*;Mitchell Marsh,AR,2,DC*;Jake Fraser-McGurk,BAT,2,DC*;Jofra Archer,BOW,2,MI*;Noor Ahmad,BOW,2,GT*;Josh Hazlewood,BOW,2,RCB*;Bhuvneshwar Kumar,BOW,2,SRH;T Natarajan,BOW,2,SRH;Deepak Chahar,BOW,2,CSK;Avesh Khan,BOW,2,LSG;Prasidh Krishna,BOW,2,RR;Mukesh Kumar,BOW,1.5,DC;Rachin Ravindra,AR,1.5,CSK*;Devon Conway,BAT,2,CSK*;Faf du Plessis,BAT,2,RCB*;Quinton de Kock,WK,2,LSG*;Jitesh Sharma,WK,1,PBKS;Rahmanullah Gurbaz,WK,1.5,KKR*;Washington Sundar,AR,2,SRH;Krunal Pandya,AR,2,LSG;Rahul Chahar,BOW,1,PBKS;Wanindu Hasaranga,AR,1.5,SRH*;Adam Zampa,BOW,1.5,RR*;Mitchell Santner,AR,2,CSK*;Nitish Rana,BAT,1.5,KKR;Ajinkya Rahane,BAT,1.5,KKR;Sam Curran,AR,2,PBKS*;Will Jacks,AR,2,RCB*;Jonny Bairstow,WK,2,PBKS*;Aiden Markram,BAT,2,SRH*;Ravi Bishnoi,BOW,1.5,LSG;Tim David,BAT,1.5,MI*;Abhishek Porel,WK,0.5,DC;Rahul Tewatia,AR,1,GT;Shahrukh Khan,AR,0.75,GT;Umran Malik,BOW,0.75,SRH";
@@ -52,6 +78,9 @@ var amt=function(x){var c=Math.floor(x+1e-9),l=Math.round((x-c)*100);return(c?c+
 var ls=function(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}return ''};
 
 var socket=null,ME=null,CW=true,S=null,NM='',MSG='',SND=true,LAST=null,CD=null,HOST=false,CF=0,AC=null;
+
+NM=ls('iplnm');
+if(NM && $('#nm')) $('#nm').value = NM;
 
 function parse(s,sep){
   if(!s)return[];
@@ -71,26 +100,9 @@ var save=function(){try{if(socket&&S)socket.emit('sync_state',{code:S.code,newSt
 var mine=function(t){return HOST||(CW&&S.ts[t].u===ME)};
 var tn=function(t){return S.ts[t].c+(S.ts[t].o?' ('+esc(S.ts[t].o)+')':'')};
 
-function home(){
-  var appEl=$('#app');
-  if(!appEl)return;
-  appEl.innerHTML='<h1>🏏 IPL Auction Arena</h1>'+
-    (MSG?'<p style="color:var(--bad)">'+esc(MSG)+'</p>':'')+
-    '<div class="card"><h3>Your name</h3><input id="nm" value="'+esc(NM)+'" placeholder="e.g. Sathish"></div>'+
-    '<div class="card"><h3>Join a lobby</h3><div class="row"><input id="cd" inputmode="numeric" placeholder="4-digit lobby PIN"><button class="pri" onclick="join()">Join</button></div></div>'+
-    '<div class="card"><h3>Or create a lobby (you become the host)</h3><div class="grid">'+
-    '<label>Purse (Cr)<input id="pu" type="number" value="100"></label>'+
-    '<label>RTM cards each<input id="rt" type="number" value="2"></label>'+
-    '<label>Max squad<input id="sq" type="number" value="15"></label>'+
-    '<label>Shuffle order<input id="sh" type="checkbox" checked></label></div>'+
-    '<textarea id="ex" rows="2" style="margin:10px 0" placeholder="Extra players (optional): Name,ROLE,BaseCr,PrevTeam, one per line"></textarea>'+
-    '<button class="pri" onclick="create()">Create lobby</button></div>';
-  MSG='';
-}
-
 function nameOk(){
   NM=($('#nm').value||'').trim();
-  if(!NM){MSG='Enter your name first.';home();return false}
+  if(!NM){alert('Enter your name first.');return false}
   ls('iplnm',NM);
   return true;
 }
@@ -98,7 +110,7 @@ function nameOk(){
 function join(){
   if(!nameOk())return;
   var c=$('#cd').value.trim();
-  if(!c){MSG='Enter the lobby PIN.';return home()}
+  if(!c){alert('Enter the lobby PIN.');return}
   $('#app').innerHTML='<p class="mut">Joining lobby '+esc(c)+'…</p>';
   if(socket) socket.emit('join_room', { code: c, name: NM });
 }
@@ -118,7 +130,7 @@ function create(){
 
 function pick(i){if(S&&socket)socket.emit('pick_team',{code:S.code,teamIndex:i,name:NM})}
 function kick(i){if(S&&socket)socket.emit('kick_team',{code:S.code,teamIndex:i})}
-function leave(){if(S&&socket)socket.emit('leave_room',{code:S.code});S=null;ls('iplob',null);home()}
+function leave(){if(S&&socket)socket.emit('leave_room',{code:S.code});S=null;ls('iplob',null);location.reload()}
 function closeLobby(){CF=0;if(S&&socket)socket.emit('close_room',{code:S.code})}
 
 function lobby(){
@@ -241,10 +253,6 @@ function auction(){
 
 function render(){if(!S)return;S.st=='lobby'?lobby():auction()}
 
-// Initialization
-NM=ls('iplnm');
-home();
-
 try {
   if (typeof io !== 'undefined') {
     socket = io();
@@ -278,11 +286,13 @@ try {
     });
 
     socket.on('room_closed', function(msg){
-      S = null; ls('iplob', null); MSG = msg||'Lobby closed.'; home();
+      alert(msg || 'Lobby closed.');
+      location.reload();
     });
 
     socket.on('error_msg', function(msg){
-      MSG = msg; ls('iplob', null); home();
+      alert(msg);
+      location.reload();
     });
   }
 } catch(err) {
