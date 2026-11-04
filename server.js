@@ -8,24 +8,17 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 
-// Serve static assets (css, js, images)
+// Serve static assets
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Catch-all route for frontend - DO NOT intercept /socket.io requests!
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/socket.io')) {
-    return next();
-  }
-  const rootPath = path.join(__dirname, 'index.html');
-  const publicPath = path.join(__dirname, 'public', 'index.html');
-  if (fs.existsSync(rootPath)) {
-    return res.sendFile(rootPath);
-  }
-  if (fs.existsSync(publicPath)) {
-    return res.sendFile(publicPath);
-  }
-  res.status(404).send('index.html not found! Please place index.html in your repository.');
+// Serve the index.html page ONLY on root routes
+app.get('/', (req, res) => {
+  const rootFile = path.join(__dirname, 'index.html');
+  const publicFile = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(rootFile)) return res.sendFile(rootFile);
+  if (fs.existsSync(publicFile)) return res.sendFile(publicFile);
+  res.send('index.html not found');
 });
 
 const server = http.createServer(app);
@@ -70,6 +63,7 @@ io.on('connection', (socket) => {
     };
 
     socket.join(code);
+    console.log('Lobby created:', code, 'by', name);
     socket.emit('room_created', { code });
     io.to(code).emit('state_update', rooms[code]);
   });

@@ -67,7 +67,7 @@ function init(){
   home(); // Render home screen immediately so the page is never blank!
 
   try {
-    socket = io({ transports: ['websocket', 'polling'] });
+    socket = io();
 
     socket.on('connect', () => {
       ME = socket.id;
