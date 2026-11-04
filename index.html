@@ -67,7 +67,7 @@ function init(){
   home(); // Render home screen immediately so the page is never blank!
 
   try {
-    socket = io(BACKEND_URL);
+    socket = io({ transports: ['websocket', 'polling'] });
 
     socket.on('connect', () => {
       ME = socket.id;
@@ -146,6 +146,10 @@ function join(){
 
 function create(){
   if(!nameOk())return;
+  if(!socket || !socket.connected){
+    $('#app').insertAdjacentHTML('beforeend', '<p style="color:var(--bad)">Connecting to server, please wait 3 seconds and tap again…</p>');
+    return;
+  }
   const cfg={pu:+$('#pu').value||100,rt:+$('#rt').value||0,sq:+$('#sq').value||15,sh:$('#sh').checked,ex:$('#ex').value};
   $('#app').innerHTML='<p class="mut">Creating lobby…</p>';
   socket.emit('create_room', { cfg, name: NM });

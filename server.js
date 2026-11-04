@@ -8,14 +8,17 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 
-// Serve static files from root and public
+// Serve static assets (css, js, images)
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve index.html regardless of whether it was placed in root or public/
-app.get('*', (req, res) => {
-  const publicPath = path.join(__dirname, 'public', 'index.html');
+// Catch-all route for frontend - DO NOT intercept /socket.io requests!
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/socket.io')) {
+    return next();
+  }
   const rootPath = path.join(__dirname, 'index.html');
+  const publicPath = path.join(__dirname, 'public', 'index.html');
   if (fs.existsSync(rootPath)) {
     return res.sendFile(rootPath);
   }
@@ -37,6 +40,8 @@ const TM = {CSK:1, MI:1, RCB:1, KKR:1, DC:1, SRH:1, RR:1, PBKS:1, GT:1, LSG:1};
 const rooms = {};
 
 io.on('connection', (socket) => {
+  console.log('Player connected:', socket.id);
+
   socket.on('create_room', ({ cfg, name }) => {
     let code;
     for (let i = 0; i < 10; i++) {
@@ -129,7 +134,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {});
+  socket.on('disconnect', () => {
+    console.log('Player disconnected:', socket.id);
+  });
 });
 
 const PORT = process.env.PORT || 3000;
