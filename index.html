@@ -39,7 +39,7 @@ details{margin:4px 0;font-size:14px}summary{cursor:pointer;font-weight:600}
 </style></head>
 <body><div id="app"></div>
 <script>
-// REPLACE WITH YOUR RENDER BACKEND URL (Leave as is for local testing)
+// Automatically connect to the current host
 const BACKEND_URL = window.location.origin;
 
 const TM={CSK:1,MI:1,RCB:1,KKR:1,DC:1,SRH:1,RR:1,PBKS:1,GT:1,LSG:1};
@@ -64,57 +64,57 @@ const tn=t=>S.ts[t].c+(S.ts[t].o?' ('+esc(S.ts[t].o)+')':'');
 /* connect */
 function init(){
   NM=ls('iplnm');
-  socket = io(BACKEND_URL);
+  home(); // Render home screen immediately so the page is never blank!
 
-  socket.on('connect', () => {
-    ME = socket.id;
-    const code = ls('iplob');
-    if (code) {
-      socket.emit('join_room', { code, name: NM });
-    } else {
+  try {
+    socket = io(BACKEND_URL);
+
+    socket.on('connect', () => {
+      ME = socket.id;
+      const code = ls('iplob');
+      if (code) {
+        socket.emit('join_room', { code, name: NM });
+      }
+    });
+
+    socket.on('room_created', ({ code }) => {
+      ls('iplob', code);
+      HOST = true;
+    });
+
+    socket.on('joined_room', ({ code, isHost }) => {
+      ls('iplob', code);
+      HOST = isHost;
+    });
+
+    socket.on('state_update', (roomState) => {
+      S = roomState;
+      HOST = (S.h === ME);
+      const e = S.ev;
+      if(e){
+        if(LAST!==null && e.n!==LAST) play(e);
+        LAST=e.n;
+      } else if(LAST===null) {
+        LAST=0;
+      }
+      render();
+    });
+
+    socket.on('room_closed', (msg) => {
+      S = null;
+      ls('iplob', null);
+      MSG = msg || 'Lobby closed.';
       home();
-    }
-  });
+    });
 
-  socket.on('room_created', ({ code }) => {
-    ls('iplob', code);
-    HOST = true;
-  });
-
-  socket.on('joined_room', ({ code, isHost }) => {
-    ls('iplob', code);
-    HOST = isHost;
-  });
-
-  socket.on('state_update', (roomState) => {
-    S = roomState;
-    HOST = (S.h === ME);
-    const e = S.ev;
-    if(e){
-      if(LAST!==null && e.n!==LAST) play(e);
-      LAST=e.n;
-    } else if(LAST===null) {
-      LAST=0;
-    }
-    render();
-  });
-
-  socket.on('room_closed', (msg) => {
-    S = null;
-    ls('iplob', null);
-    MSG = msg || 'Lobby closed.';
-    home();
-  });
-
-  socket.on('error_msg', (msg) => {
-    MSG = msg;
-    ls('iplob', null);
-    home();
-  });
-
-  socket.on('disconnect', () => {
-    // disconnected
-  });
+    socket.on('error_msg', (msg) => {
+      MSG = msg;
+      ls('iplob', null);
+      home();
+    });
+  } catch(e) {
+    console.error(e);
+  }
 }
 
 function leave(){
@@ -128,7 +128,9 @@ function closeLobby(){
 
 /* home */
 function home(){
-$('#app').innerHTML=`<h1>🏏 IPL Auction Arena</h1>${MSG?'<p style="color:var(--bad)">'+esc(MSG)+'</p>':''}<div class="card"><h3>Your name</h3><input id="nm" value="${esc(NM)}" placeholder="e.g. Sathish"></div>
+const appEl = $('#app');
+if(!appEl) return;
+appEl.innerHTML=`<h1>🏏 IPL Auction Arena</h1>${MSG?'<p style="color:var(--bad)">'+esc(MSG)+'</p>':''}<div class="card"><h3>Your name</h3><input id="nm" value="${esc(NM)}" placeholder="e.g. Sathish"></div>
 <div class="card"><h3>Join a lobby</h3><div class="row"><input id="cd" inputmode="numeric" placeholder="4-digit lobby PIN"><button class="pri" onclick="join()">Join</button></div></div>
 <div class="card"><h3>Or create a lobby (you become the host)</h3><div class="grid"><label>Purse (Cr)<input id="pu" type="number" value="100"></label><label>RTM cards each<input id="rt" type="number" value="2"></label><label>Max squad<input id="sq" type="number" value="15"></label><label>Shuffle order<input id="sh" type="checkbox" checked></label></div>
 <textarea id="ex" rows="2" style="margin:10px 0" placeholder="Extra players (optional): Name,ROLE,BaseCr,PrevTeam, one per line"></textarea><button class="pri" onclick="create()">Create lobby</button></div>`;MSG=''}
@@ -164,8 +166,7 @@ $('#app').innerHTML=`<div class="top"><h1>🏏 Lobby</h1><button onclick="leave(
 <div class="grid2">${S.ts.map((t,i)=>`<div class="card tb" style="margin:0"><b>${t.c}</b><small>${t.u?esc(t.o)+(t.u===S.h?' 👑':''):'Free'}</small>${t.u?(t.u===ME?'<small>This is you</small>':''):`<button ${CW?'':'disabled'} onclick="pick(${i})">${me>=0?'Switch here':'Pick team'}</button>`}${HOST&&t.u&&t.u!==ME?`<button onclick="kick(${i})">Remove</button>`:''}</div>`).join('')}</div>
 ${HOST?`<div class="acts"><button class="pri" ${n>=2?'':'disabled'} onclick="begin()">▶ Start auction (${n} teams)</button><button onclick="closeLobby()">Close lobby</button></div>`:'<p class="mut">Pick your team. The host starts the auction when everyone is set.</p>'}`}
 
-function begin(){let q=parse(P,';').concat(parse(S.cfg.ex||'','
-'));
+function begin(){let q=parse(P,';').concat(parse(S.cfg.ex||'','\n'));
 if(S.cfg.sh)for(let i=q.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[q[i],q[j]]=[q[j],q[i]]}
 S.ts=S.ts.filter(t=>t.u);Object.assign(S,{st:'auction',q,i:0,max:S.cfg.sq,bid:q[0].b,by:null,ph:'bid',log:[],hist:[],un:[],cd:''});
 ev('new','Welcome to the I P L auction! First up: '+q[0].n+'. Base price '+amt(q[0].b)+'.');save()}
@@ -203,7 +204,13 @@ if(S.ph=='match')h+=`<div class="card rtm"><h3>⚡ Match the raise?</h3><p>${tn(
 }else h+=`<div class="card"><h2>🏆 Auction complete</h2><p class="mut">Sold ${S.ts.reduce((a,t)=>a+t.sq.length,0)} players, ${S.un.length} unsold.</p>${S.un.length&&HOST?'<button class="pri" onclick="again()">Auction unsold players again</button>':''}</div>`;
 h+=`<div class="card"><h3>Teams</h3><div class="wrap"><table><tr><th>Team<th>Purse<th>RTM<th>Squad</tr>${S.ts.map(t=>`<tr><td>${t.c}${t.u===S.h?' 👑':''}${t.o?' · '+esc(t.o):''}<td>${cr(t.purse)}<td>${t.rtm}<td>${t.sq.length}/${S.max}`).join('')}</table></div>${S.ts.map(t=>`<details ${p?'':'open'}><summary>${t.c} squad (${t.sq.length})</summary>${t.sq.map(s=>esc(s.n)+' — '+cr(s.p)+(s.r?' (RTM)':'')).join('<br>')||'<span class="mut">Empty</span>'}</details>`).join('')}</div>`;
 h+=`<div class="card"><h3>Recent</h3>${S.log.slice(-8).reverse().map(l=>'<div class="log">'+esc(l)+'</div>').join('')||'<span class="mut">Nothing yet</span>'}</div>`;
-$('#app').innerHTML=h}
+appEl.innerHTML=h}
 function render(){if(!S)return;S.st=='lobby'?lobby():auction()}
-init();
+
+// Run on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 </script></body></html>
