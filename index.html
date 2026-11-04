@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IPL Auction Arena</title>
+<!-- Socket.io Client Library -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+:root{--bg:#f4f1ea;--card:#fff;--ink:#1b1b1f;--mut:#6b6b76;--acc:#1f4fd8;--ok:#14803c;--bad:#c0262d;--line:#e2ddd0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111318;--card:#1b1e26;--ink:#eceef3;--mut:#9aa0ae;--acc:#6b8cff;--ok:#3ecf74;--bad:#ff6b72;--line:#2b3040;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111318;--card:#1b1e26;--ink:#eceef3;--mut:#9aa0ae;--acc:#6b8cff;--ok:#3ecf74;--bad:#ff6b72;--line:#2b3040;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{max-width:760px;margin:0 auto;padding:14px}
+h1{font-size:22px;margin:0 0 6px}h2{font-size:30px;margin:4px 0}h3{margin:0 0 8px;font-size:16px}
+.mut{color:var(--mut);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}.row input.to{flex:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.grid label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--mut)}
+input,textarea,select{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+input[type=checkbox]{width:auto}
+button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600}
+button:disabled{opacity:.4;cursor:not-allowed}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--line);margin:0 6px 6px 0}
+.big{font-size:40px;font-weight:800;color:var(--acc);margin:6px 0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px}
+.tb{display:flex;flex-direction:column;gap:2px;text-align:left;font-weight:700}
+.tb small{font-weight:400;color:var(--mut);font-size:12px}
+.acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.rtm{border-color:var(--acc);border-width:2px}
+.rtm .acts,.rtm p{margin:8px 0}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line)}
+details{margin:4px 0;font-size:14px}summary{cursor:pointer;font-weight:600}
+.log{font-size:14px;margin:2px 0}
+.cd{font-weight:700;color:var(--bad);font-size:20px;margin-top:6px}
+</style></head>
+<body><div id="app"></div>
+<script>
+// REPLACE WITH YOUR RENDER BACKEND URL (Leave as is for local testing)
+const BACKEND_URL = window.location.origin;
+
+const TM={CSK:1,MI:1,RCB:1,KKR:1,DC:1,SRH:1,RR:1,PBKS:1,GT:1,LSG:1};
+const P="Rishabh Pant,WK,2,DC;Shreyas Iyer,BAT,2,KKR;KL Rahul,WK,2,LSG;Jos Buttler,WK,2,RR*;Mohammed Shami,BOW,2,GT;Arshdeep Singh,BOW,2,PBKS;Yuzvendra Chahal,BOW,2,RR;Kagiso Rabada,BOW,2,PBKS*;Mitchell Starc,BOW,2,KKR*;Mohammed Siraj,BOW,2,RCB;Trent Boult,BOW,2,RR*;Phil Salt,WK,2,KKR*;Liam Livingstone,AR,2,PBKS*;David Miller,BAT,1.5,GT*;Ishan Kishan,WK,2,MI;Devdutt Padikkal,BAT,0.75,LSG;Rahul Tripathi,BAT,0.75,SRH;Venkatesh Iyer,AR,2,KKR;Harshal Patel,BOW,2,PBKS;R Ashwin,AR,2,RR;Marcus Stoinis,AR,2,LSG*;Glenn Maxwell,AR,2,RCB*;Mitchell Marsh,AR,2,DC*;Jake Fraser-McGurk,BAT,2,DC*;Jofra Archer,BOW,2,MI*;Noor Ahmad,BOW,2,GT*;Josh Hazlewood,BOW,2,RCB*;Bhuvneshwar Kumar,BOW,2,SRH;T Natarajan,BOW,2,SRH;Deepak Chahar,BOW,2,CSK;Avesh Khan,BOW,2,LSG;Prasidh Krishna,BOW,2,RR;Mukesh Kumar,BOW,1.5,DC;Rachin Ravindra,AR,1.5,CSK*;Devon Conway,BAT,2,CSK*;Faf du Plessis,BAT,2,RCB*;Quinton de Kock,WK,2,LSG*;Jitesh Sharma,WK,1,PBKS;Rahmanullah Gurbaz,WK,1.5,KKR*;Washington Sundar,AR,2,SRH;Krunal Pandya,AR,2,LSG;Rahul Chahar,BOW,1,PBKS;Wanindu Hasaranga,AR,1.5,SRH*;Adam Zampa,BOW,1.5,RR*;Mitchell Santner,AR,2,CSK*;Nitish Rana,BAT,1.5,KKR;Ajinkya Rahane,BAT,1.5,KKR;Sam Curran,AR,2,PBKS*;Will Jacks,AR,2,RCB*;Jonny Bairstow,WK,2,PBKS*;Aiden Markram,BAT,2,SRH*;Ravi Bishnoi,BOW,1.5,LSG;Tim David,BAT,1.5,MI*;Abhishek Porel,WK,0.5,DC;Rahul Tewatia,AR,1,GT;Shahrukh Khan,AR,0.75,GT;Umran Malik,BOW,0.75,SRH";
+
+const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cr=x=>'₹'+(+x).toFixed(2).replace(/\.?0+$/,'')+' Cr',rd=x=>Math.round(x*100)/100;
+const TN={CSK:'Chennai',MI:'Mumbai',RCB:'Bengaluru',KKR:'Kolkata',DC:'Delhi',SRH:'Hyderabad',RR:'Rajasthan',PBKS:'Punjab',GT:'Gujarat',LSG:'Lucknow'};
+const amt=x=>{const c=Math.floor(x+1e-9),l=Math.round((x-c)*100);return(c?c+' crore':'')+(c&&l?' ':'')+(l?l+' lakh':'')};
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k)||'';if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}return ''};
+let socket=null,ME=null,CW=true,S=null,NM='',MSG='',SND=true,LAST=null,CD=null,HOST=false,CF=0,AC=null;
+function parse(s,sep){return s.split(sep).map(x=>x.trim()).filter(Boolean).map(x=>{let[a,r,b,t]=x.split(',').map(y=>y.trim());t=t||'';const o=t.includes('*');return{n:a,r:(r||'BAT').toUpperCase(),b:parseFloat(b)||0.5,t:t.replace('*','').toUpperCase(),o}})}
+/* sound */
+function beep(f,d,ty,g){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),v=AC.createGain();o.type=ty||'sine';o.frequency.value=f;v.gain.setValueAtTime(g||.2,AC.currentTime);v.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(v);v.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+function talk(t){if(!SND||!window.speechSynthesis)return;try{const u=new SpeechSynthesisUtterance(t);u.rate=1;u.pitch=.85;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+function play(e){if(!SND)return;const k=e.k;if(k=='bid')beep(880,.12);if(k=='sold'){beep(160,.25,'square',.35);setTimeout(()=>beep(120,.3,'square',.35),180)}if(k=='go1'||k=='go2')beep(520,.15,'triangle');if(k=='uns')beep(200,.4,'sawtooth',.15);if(k=='rtm')beep(700,.2,'triangle');talk(e.t)}
+const ev=(k,t)=>{S.ev={n:(S.ev?S.ev.n:0)+1,k,t}};
+const save=()=>{try{if(socket&&S)socket.emit('sync_state',{code:S.code,newState:S})}catch(e){}};
+const mine=t=>HOST||(CW&&S.ts[t].u===ME);
+const tn=t=>S.ts[t].c+(S.ts[t].o?' ('+esc(S.ts[t].o)+')':'');
+
+/* connect */
+function init(){
+  NM=ls('iplnm');
+  socket = io(BACKEND_URL);
+
+  socket.on('connect', () => {
+    ME = socket.id;
+    const code = ls('iplob');
+    if (code) {
+      socket.emit('join_room', { code, name: NM });
+    } else {
+      home();
+    }
+  });
+
+  socket.on('room_created', ({ code }) => {
+    ls('iplob', code);
+    HOST = true;
+  });
+
+  socket.on('joined_room', ({ code, isHost }) => {
+    ls('iplob', code);
+    HOST = isHost;
+  });
+
+  socket.on('state_update', (roomState) => {
+    S = roomState;
+    HOST = (S.h === ME);
+    const e = S.ev;
+    if(e){
+      if(LAST!==null && e.n!==LAST) play(e);
+      LAST=e.n;
+    } else if(LAST===null) {
+      LAST=0;
+    }
+    render();
+  });
+
+  socket.on('room_closed', (msg) => {
+    S = null;
+    ls('iplob', null);
+    MSG = msg || 'Lobby closed.';
+    home();
+  });
+
+  socket.on('error_msg', (msg) => {
+    MSG = msg;
+    ls('iplob', null);
+    home();
+  });
+
+  socket.on('disconnect', () => {
+    // disconnected
+  });
+}
+
+function leave(){
+  if(S && socket) socket.emit('leave_room', { code: S.code });
+  S=null; ls('iplob', null); home();
+}
+function closeLobby(){
+  CF=0;
+  if(S && socket) socket.emit('close_room', { code: S.code });
+}
+
+/* home */
+function home(){
+$('#app').innerHTML=`<h1>🏏 IPL Auction Arena</h1>${MSG?'<p style="color:var(--bad)">'+esc(MSG)+'</p>':''}<div class="card"><h3>Your name</h3><input id="nm" value="${esc(NM)}" placeholder="e.g. Sathish"></div>
+<div class="card"><h3>Join a lobby</h3><div class="row"><input id="cd" inputmode="numeric" placeholder="4-digit lobby PIN"><button class="pri" onclick="join()">Join</button></div></div>
+<div class="card"><h3>Or create a lobby (you become the host)</h3><div class="grid"><label>Purse (Cr)<input id="pu" type="number" value="100"></label><label>RTM cards each<input id="rt" type="number" value="2"></label><label>Max squad<input id="sq" type="number" value="15"></label><label>Shuffle order<input id="sh" type="checkbox" checked></label></div>
+<textarea id="ex" rows="2" style="margin:10px 0" placeholder="Extra players (optional): Name,ROLE,BaseCr,PrevTeam, one per line"></textarea><button class="pri" onclick="create()">Create lobby</button></div>`;MSG=''}
+
+function nameOk(){NM=($('#nm').value||'').trim();if(!NM){MSG='Enter your name first.';home();return false}ls('iplnm',NM);return true}
+function join(){
+  if(!nameOk())return;
+  const c=$('#cd').value.trim();
+  if(!c){MSG='Enter the lobby PIN.';return home()}
+  $('#app').innerHTML='<p class="mut">Joining lobby '+esc(c)+'…</p>';
+  socket.emit('join_room', { code: c, name: NM });
+}
+
+function create(){
+  if(!nameOk())return;
+  const cfg={pu:+$('#pu').value||100,rt:+$('#rt').value||0,sq:+$('#sq').value||15,sh:$('#sh').checked,ex:$('#ex').value};
+  $('#app').innerHTML='<p class="mut">Creating lobby…</p>';
+  socket.emit('create_room', { cfg, name: NM });
+}
+
+/* lobby */
+function pick(i){
+  if(S && socket) socket.emit('pick_team', { code: S.code, teamIndex: i, name: NM });
+}
+function kick(i){
+  if(S && socket) socket.emit('kick_team', { code: S.code, teamIndex: i });
+}
+
+function lobby(){
+const me=S.ts.findIndex(t=>t.u===ME),n=S.ts.filter(t=>t.u).length;
+$('#app').innerHTML=`<div class="top"><h1>🏏 Lobby</h1><button onclick="leave()">Leave</button></div>
+<div class="card"><div class="mut">Lobby PIN: share it with your friends</div><div class="big">${esc(S.code)}</div><div class="mut">${n} of 10 teams taken · ${HOST?'You are the host 👑':'Waiting for the host to start'}</div></div>
+<div class="grid2">${S.ts.map((t,i)=>`<div class="card tb" style="margin:0"><b>${t.c}</b><small>${t.u?esc(t.o)+(t.u===S.h?' 👑':''):'Free'}</small>${t.u?(t.u===ME?'<small>This is you</small>':''):`<button ${CW?'':'disabled'} onclick="pick(${i})">${me>=0?'Switch here':'Pick team'}</button>`}${HOST&&t.u&&t.u!==ME?`<button onclick="kick(${i})">Remove</button>`:''}</div>`).join('')}</div>
+${HOST?`<div class="acts"><button class="pri" ${n>=2?'':'disabled'} onclick="begin()">▶ Start auction (${n} teams)</button><button onclick="closeLobby()">Close lobby</button></div>`:'<p class="mut">Pick your team. The host starts the auction when everyone is set.</p>'}`}
+
+function begin(){let q=parse(P,';').concat(parse(S.cfg.ex||'','
+'));
+if(S.cfg.sh)for(let i=q.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[q[i],q[j]]=[q[j],q[i]]}
+S.ts=S.ts.filter(t=>t.u);Object.assign(S,{st:'auction',q,i:0,max:S.cfg.sq,bid:q[0].b,by:null,ph:'bid',log:[],hist:[],un:[],cd:''});
+ev('new','Welcome to the I P L auction! First up: '+q[0].n+'. Base price '+amt(q[0].b)+'.');save()}
+
+/* auction logic */
+const nextBid=()=>S.by==null?S.q[S.i].b:rd(S.bid+(S.bid<1?.1:S.bid<5?.25:.5));
+const nt=()=>S.q[S.i]?' Next up: '+S.q[S.i].n+', base price '+amt(S.q[S.i].b)+'.':' That was the last player. The auction is complete!';
+function nxt(){S.i++;S.bid=S.q[S.i]?S.q[S.i].b:0;S.by=null;S.ph='bid';S.hist=[];S.cd=''}
+function bid(i){const nb=nextBid();S.hist.push([S.bid,S.by]);S.bid=nb;S.by=i;S.cd='';ev('bid',TN[S.ts[i].c]+', '+amt(nb));save()}
+function undo(){[S.bid,S.by]=S.hist.pop();S.cd='';save()}
+function hammer(){const p=S.q[S.i];
+if(S.by==null){S.un.push(p);S.log.push('❌ '+p.n+' unsold');nxt();ev('uns','Unsold.'+nt());return save()}
+const r=S.ts.findIndex((t,i)=>t.c==p.t&&i!=S.by&&t.rtm>0&&t.purse>=S.bid&&t.sq.length<S.max);
+if(r<0)return fin(S.by,S.bid,0);S.rt=r;S.ph='rtm';S.cd='';ev('rtm',TN[S.ts[r].c]+' can use the Right to Match!');save()}
+function rtmUse(){S.ph='raise';save()}
+function raise(){const v=+$('#rz').value;if(!(v>S.bid)||v>S.ts[S.by].purse)return;S.price=v;S.ph='match';ev('rtm','Bid raised to '+amt(v)+'. Will you match?');save()}
+function fin(t,pr,u){const tm=S.ts[t],p=S.q[S.i];tm.purse=rd(tm.purse-pr);if(u)tm.rtm--;tm.sq.push({n:p.n,p:pr,r:u});
+S.log.push('✅ '+p.n+' → '+tm.c+' for '+cr(pr)+(u?' (RTM)':''));nxt();
+ev('sold','Sold! '+p.n+' goes to '+TN[tm.c]+' for '+amt(pr)+(u?', using the Right to Match.':'.')+nt());save()}
+function again(){S.q=S.un;S.un=[];S.i=0;S.bid=S.q[0].b;ev('new','Unsold round! First up: '+S.q[0].n+'.');save()}
+function cdStart(){clearTimeout(CD);const k=()=>S.bid+'|'+S.by+'|'+S.i,k0=k();S.cd='Going once';ev('go1','Going once');save();
+CD=setTimeout(()=>{if(k()!==k0||S.ph!='bid')return;S.cd='Going twice';ev('go2','Going twice');save();
+CD=setTimeout(()=>{if(k()!==k0||S.ph!='bid')return;hammer()},2500)},2500)}
+
+/* auction view */
+function auction(){
+const p=S.q[S.i],r=S.rt;
+let h=`<div class="top"><h1>🏏 IPL Auction</h1><div><button onclick="SND=!SND;if(SND)talk('Sound on');render()">${SND?'🔊':'🔇'}</button> ${HOST?(CF?'<button onclick="closeLobby()">Yes, close lobby</button> <button onclick="CF=0;render()">Cancel</button>':'<button onclick="CF=1;render()">Close lobby</button>'):'<button onclick="leave()">Leave</button>'}</div></div><div class="mut">🔴 Live · PIN ${esc(S.code)} · ${HOST?'host 👑':(S.ts.some(t=>t.u===ME)?'bid &amp; view only':'spectating')}</div>`;
+if(p){const nb=nextBid();
+h+=`<div class="card"><div class="mut">Player ${S.i+1} of ${S.q.length} · Unsold so far: ${S.un.length}</div><h2>${esc(p.n)}</h2><div><span class="tag">${esc(p.r)}</span>${p.o?'<span class="tag">Overseas</span>':''}${p.t?'<span class="tag">Prev team: '+esc(p.t)+'</span>':''}</div><div class="mut">Base ${cr(p.b)}</div><div class="big">${cr(S.bid)}</div><div>${S.by==null?'No bids yet':'Leading: <b>'+tn(S.by)+'</b>'}</div>${S.cd?'<div class="cd">⏱ '+S.cd+'…</div>':''}</div>`;
+if(S.ph=='bid')h+=`<div class="grid2">${S.ts.map((t,i)=>`<button class="tb" ${i!=S.by&&t.purse>=nb&&t.sq.length<S.max&&mine(i)?'':'disabled'} onclick="bid(${i})">${t.c}<small>${esc(t.o)}</small><small>Bid ${cr(nb)}</small></button>`).join('')}</div>${HOST?`<div class="acts"><button class="pri" onclick="cdStart()">⏱ Going once, twice…</button><button onclick="hammer()">🔨 ${S.by==null?'Unsold now':'Sold now'}</button>${S.hist.length?'<button onclick="undo()">Undo last bid</button>':''}</div>`:'<p class="mut">The host runs the hammer. Tap your team button to bid.</p>'}`;
+if(S.ph=='rtm')h+=`<div class="card rtm"><h3>⚡ RTM available</h3><p><b>${tn(r)}</b> was the previous team of ${esc(p.n)}. Winning bid: ${cr(S.bid)} by <b>${tn(S.by)}</b>. Use RTM?</p><div class="acts"><button class="pri" ${mine(r)?'':'disabled'} onclick="rtmUse()">Use RTM</button><button ${mine(r)?'':'disabled'} onclick="fin(S.by,S.bid,0)">Decline</button></div></div>`;
+if(S.ph=='raise')h+=`<div class="card rtm"><h3>⚡ RTM used by ${tn(r)}</h3><p>${tn(S.by)} may raise once (max ${cr(S.ts[S.by].purse)}), then ${S.ts[r].c} matches or declines.</p><input id="rz" type="number" step="0.05" value="${rd(S.bid+.5)}"><div class="acts"><button class="pri" ${mine(S.by)?'':'disabled'} onclick="raise()">Raise bid</button><button ${mine(S.by)?'':'disabled'} onclick="fin(S.rt,S.bid,1)">No raise: RTM team takes player</button></div></div>`;
+if(S.ph=='match')h+=`<div class="card rtm"><h3>⚡ Match the raise?</h3><p>${tn(S.by)} raised to <b>${cr(S.price)}</b>. ${tn(r)}, match it?</p><div class="acts"><button class="pri" ${S.ts[r].purse>=S.price&&mine(r)?'':'disabled'} onclick="fin(S.rt,S.price,1)">Match (uses RTM)</button><button ${mine(r)?'':'disabled'} onclick="fin(S.by,S.price,0)">Decline</button></div></div>`;
+}else h+=`<div class="card"><h2>🏆 Auction complete</h2><p class="mut">Sold ${S.ts.reduce((a,t)=>a+t.sq.length,0)} players, ${S.un.length} unsold.</p>${S.un.length&&HOST?'<button class="pri" onclick="again()">Auction unsold players again</button>':''}</div>`;
+h+=`<div class="card"><h3>Teams</h3><div class="wrap"><table><tr><th>Team<th>Purse<th>RTM<th>Squad</tr>${S.ts.map(t=>`<tr><td>${t.c}${t.u===S.h?' 👑':''}${t.o?' · '+esc(t.o):''}<td>${cr(t.purse)}<td>${t.rtm}<td>${t.sq.length}/${S.max}`).join('')}</table></div>${S.ts.map(t=>`<details ${p?'':'open'}><summary>${t.c} squad (${t.sq.length})</summary>${t.sq.map(s=>esc(s.n)+' — '+cr(s.p)+(s.r?' (RTM)':'')).join('<br>')||'<span class="mut">Empty</span>'}</details>`).join('')}</div>`;
+h+=`<div class="card"><h3>Recent</h3>${S.log.slice(-8).reverse().map(l=>'<div class="log">'+esc(l)+'</div>').join('')||'<span class="mut">Nothing yet</span>'}</div>`;
+$('#app').innerHTML=h}
+function render(){if(!S)return;S.st=='lobby'?lobby():auction()}
+init();
+</script></body></html>
