@@ -8,11 +8,10 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 
-// Serve static assets (css, js, images)
+// Serve static assets from root and public
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve the index.html page ONLY on root routes
 app.get('/', (req, res) => {
   const rootFile = path.join(__dirname, 'index.html');
   const publicFile = path.join(__dirname, 'public', 'index.html');
@@ -63,7 +62,6 @@ io.on('connection', (socket) => {
     };
 
     socket.join(code);
-    console.log('Lobby created:', code, 'by', name);
     socket.emit('room_created', { code });
     io.to(code).emit('state_update', rooms[code]);
   });
@@ -133,7 +131,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Explicitly bind to '0.0.0.0' for Render
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on 0.0.0.0:${PORT}`);
 });
